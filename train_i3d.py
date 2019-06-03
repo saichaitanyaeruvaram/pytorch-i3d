@@ -31,7 +31,7 @@ from pytorch_i3d import InceptionI3d
 from charades_dataset import Charades as Dataset
 
 
-def run(init_lr=0.1, max_steps=64e3, mode='rgb', root='/ssd/Charades_v1_rgb', train_split='charades/charades.json', batch_size=8*2, save_model=''):
+def run(init_lr=0.1, max_steps=64e3, mode='rgb', root='/ssd/Charades_v1_rgb', train_split='charades/new_data.json', batch_size=8, save_model=''):
     # setup dataset
     print("Inside Run")
     train_transforms = transforms.Compose([videotransforms.RandomCrop(224),
@@ -42,12 +42,12 @@ def run(init_lr=0.1, max_steps=64e3, mode='rgb', root='/ssd/Charades_v1_rgb', tr
     print("Train Dataset")
     dataset = Dataset(train_split, 'training', root, mode, train_transforms)
     print("Train Dataset DataLoader")
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=12, pin_memory=True)
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True)
 
     print("Test Dataset")
     val_dataset = Dataset(train_split, 'testing', root, mode, test_transforms)
     print("Test Dataset DataLoader")
-    val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=True, num_workers=12, pin_memory=True)    
+    val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True)    
 
     dataloaders = {'train': dataloader, 'val': val_dataloader}
     datasets = {'train': dataset, 'val': val_dataset}
@@ -63,7 +63,7 @@ def run(init_lr=0.1, max_steps=64e3, mode='rgb', root='/ssd/Charades_v1_rgb', tr
         print("Running rgb")
         i3d = InceptionI3d(400, in_channels=3)
         print("loading dict")
-        i3d.load_state_dict(torch.load('models/rgb_imagenet.pt'))
+        # i3d.load_state_dict(torch.load('models/rgb_imagenet.pt'))
     i3d.replace_logits(2)
     print("Replaced logits")
     #i3d.load_state_dict(torch.load('/ssd/models/000920.pt'))
