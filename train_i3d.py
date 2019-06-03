@@ -31,18 +31,23 @@ from pytorch_i3d import InceptionI3d
 from charades_dataset import Charades as Dataset
 
 
-def run(init_lr=0.1, max_steps=64e3, mode='rgb', root='/ssd/Charades_v1_rgb', train_split='charades/charades.json', batch_size=8*5, save_model=''):
+def run(init_lr=0.1, max_steps=64e3, mode='rgb', root='/ssd/Charades_v1_rgb', train_split='charades/charades.json', batch_size=8*2, save_model=''):
     # setup dataset
+    print("Inside Run")
     train_transforms = transforms.Compose([videotransforms.RandomCrop(224),
                                            videotransforms.RandomHorizontalFlip(),
     ])
     test_transforms = transforms.Compose([videotransforms.CenterCrop(224)])
 
+    print("Train Dataset")
     dataset = Dataset(train_split, 'training', root, mode, train_transforms)
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=36, pin_memory=True)
+    print("Train Dataset DataLoader")
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=12, pin_memory=True)
 
+    print("Test Dataset")
     val_dataset = Dataset(train_split, 'testing', root, mode, test_transforms)
-    val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=True, num_workers=36, pin_memory=True)    
+    print("Test Dataset DataLoader")
+    val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=True, num_workers=12, pin_memory=True)    
 
     dataloaders = {'train': dataloader, 'val': val_dataloader}
     datasets = {'train': dataset, 'val': val_dataset}
@@ -50,24 +55,33 @@ def run(init_lr=0.1, max_steps=64e3, mode='rgb', root='/ssd/Charades_v1_rgb', tr
     
     # setup the model
     if mode == 'flow':
+        print("Running flow")
         i3d = InceptionI3d(400, in_channels=2)
+        print("loading flow dict")
         i3d.load_state_dict(torch.load('models/flow_imagenet.pt'))
     else:
+        print("Running rgb")
         i3d = InceptionI3d(400, in_channels=3)
+        print("loading dict")
         i3d.load_state_dict(torch.load('models/rgb_imagenet.pt'))
-    i3d.replace_logits(157)
+    i3d.replace_logits(2)
+    print("Replaced logits")
     #i3d.load_state_dict(torch.load('/ssd/models/000920.pt'))
     i3d.cuda()
     i3d = nn.DataParallel(i3d)
+    print("Parallel Data")
 
     lr = init_lr
+    print("Initializing SGD")
     optimizer = optim.SGD(i3d.parameters(), lr=lr, momentum=0.9, weight_decay=0.0000001)
+    print("Scheduling some multistep")
     lr_sched = optim.lr_scheduler.MultiStepLR(optimizer, [300, 1000])
 
 
     num_steps_per_update = 4 # accum gradient
     steps = 0
     # train it
+    print("Starting Training")
     while steps < max_steps:#for epoch in range(num_epochs):
         print 'Step {}/{}'.format(steps, max_steps)
         print '-' * 10
@@ -75,8 +89,10 @@ def run(init_lr=0.1, max_steps=64e3, mode='rgb', root='/ssd/Charades_v1_rgb', tr
         # Each epoch has a training and validation phase
         for phase in ['train', 'val']:
             if phase == 'train':
+                print("Training")
                 i3d.train(True)
             else:
+                print("Validation")
                 i3d.train(False)  # Set model to evaluate mode
                 
             tot_loss = 0.0
@@ -102,14 +118,14 @@ def run(init_lr=0.1, max_steps=64e3, mode='rgb', root='/ssd/Charades_v1_rgb', tr
 
                 # compute localization loss
                 loc_loss = F.binary_cross_entropy_with_logits(per_frame_logits, labels)
-                tot_loc_loss += loc_loss.data[0]
+                tot_loc_loss += loc_loss.data
 
                 # compute classification loss (with max-pooling along time B x C x T)
                 cls_loss = F.binary_cross_entropy_with_logits(torch.max(per_frame_logits, dim=2)[0], torch.max(labels, dim=2)[0])
-                tot_cls_loss += cls_loss.data[0]
+                tot_cls_loss += cls_loss.data
 
                 loss = (0.5*loc_loss + 0.5*cls_loss)/num_steps_per_update
-                tot_loss += loss.data[0]
+                tot_loss += loss.data
                 loss.backward()
 
                 if num_iter == num_steps_per_update and phase == 'train':

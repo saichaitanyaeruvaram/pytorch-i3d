@@ -58,7 +58,8 @@ def load_flow_frames(image_dir, vid, start, num):
   return np.asarray(frames, dtype=np.float32)
 
 
-def make_dataset(split_file, split, root, mode, num_classes=157):
+def make_dataset(split_file, split, root, mode, num_classes=2):
+    print("preparing dataset")
     dataset = []
     with open(split_file, 'r') as f:
         data = json.load(f)
@@ -87,6 +88,7 @@ def make_dataset(split_file, split, root, mode, num_classes=157):
         dataset.append((vid, label, data[vid]['duration'], num_frames))
         i += 1
     
+    print("preparing dataset done<"+str(len(dataset)))
     return dataset
 
 
@@ -99,6 +101,7 @@ class Charades(data_utl.Dataset):
         self.transforms = transforms
         self.mode = mode
         self.root = root
+        print("mode<"+mode+"> root<"+root+">")
 
     def __getitem__(self, index):
         """
